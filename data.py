@@ -9,7 +9,23 @@ from google.auth.exceptions import RefreshError, TransportError
 class DeeperLifeSurvey:
     def __init__(self):
         self.initialize_session_state()
-    
+        self.zone = None
+        self.region = None
+        self.division = None
+
+        # Initialize data frame here so it exists before other methods use it
+        try:
+            self.df = pd.read_csv(r"zone - Original.csv")
+            self.df.columns = [col.strip() for col in self.df.columns]  # Clean column names
+        except FileNotFoundError:
+            st.error(
+                "Error: The CSV file was not found. Please make sure "
+                "'zone - Original (1).xlsx - Sheet1 (2).csv' is in the correct directory."
+            )
+            self.df = pd.DataFrame(columns=['ZONE', 'REGION', 'DIVISION'])  # Empty fallback
+
+        
+
     def initialize_session_state(self):
         if "teaching_staff" not in st.session_state:
             st.session_state.teaching_staff = []
@@ -44,9 +60,18 @@ class DeeperLifeSurvey:
     def school_info_section(self):
         with st.container(border=True):
             st.subheader("School Information")
-            self.zone = st.text_input("Zone*", max_chars=50).strip()
-            self.region = st.text_input("Region*", max_chars=50).strip()
-            self.division = st.text_input("Division*", max_chars=50).strip()
+
+            zones = self.df['ZONE'].unique()
+            self.zone = st.selectbox("Zone*", options=zones, index=None, placeholder="Select a zone...")
+
+            if self.zone:
+                regions = self.df[self.df['ZONE'] == self.zone]['REGION'].unique()
+                self.region = st.selectbox("Region*", options=regions, index=None, placeholder="Select a region...")
+
+            if self.region:
+                divisions = self.df[self.df['REGION'] == self.region]['DIVISION'].unique()
+                self.division = st.selectbox("Division*", options=divisions, index=None, placeholder="Select a division...")
+
             self.school_name = st.text_input("Name of School*", max_chars=100).strip()
             self.head_teacher = st.text_input("Name of Head Teacher*", max_chars=100).strip()
             
@@ -171,11 +196,9 @@ class DeeperLifeSurvey:
 
     def submit_data(self):
         try:
-            # Format names properly before submission
             formatted_school_name = self.format_name(self.school_name)
             formatted_head_teacher = self.format_name(self.head_teacher)
             
-            # Prepare data dictionary
             data = {
                 "Zone": self.zone,
                 "Region": self.region,
@@ -184,15 +207,11 @@ class DeeperLifeSurvey:
                 "Head Teacher": formatted_head_teacher,
                 "Phone": self.phone,
                 "WhatsApp": self.whatsapp,
-                # ... include all other fields ...
             }
             
-            # Google Sheets submission
             client = cred()
             spreadsheet = client.open("DL Schools")
             worksheet = spreadsheet.worksheet("DL")
-            
-            # Append data to worksheet
             worksheet.append_row(list(data.values()))
             st.success("✅ Data submitted successfully!")
             
@@ -202,7 +221,6 @@ class DeeperLifeSurvey:
     def run(self):
         st.title("Deeper Life Schools - Ghana")
                
-        # Display network status
         try:
             client = cred()
             spreadsheet = client.open("DL Schools")
@@ -213,11 +231,9 @@ class DeeperLifeSurvey:
         
         self.school_info_section()
         
-        # Teaching Staff
         teaching_education = ["HND", "Diploma", "Masters", "PhD", "WASSCE", "SSCE", "O'Level", "A'Level"]
         teaching_staff = self.staff_section("teaching", teaching_education)
         
-        # Non-Teaching Staff
         non_teaching_education = ["HND", "Diploma", "WASSCE", "SSCE", "O'Level", "A'Level", 
                                  "Certificate", "JHS", "No School"]
         non_teaching_staff = self.staff_section("non_teaching", non_teaching_education)
@@ -230,7 +246,7 @@ class DeeperLifeSurvey:
             if self.validate_form():
                 self.submit_data()
 
-# Main application execution
+
 if __name__ == "__main__":
-     DeeperLifeSurvey()
+  DeeperLifeSurvey()
     
