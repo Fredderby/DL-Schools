@@ -214,6 +214,7 @@ class DeeperLifeSurvey:
             worksheet = spreadsheet.worksheet("DL")
             worksheet.append_row(list(data.values()))
             st.success("✅ Data submitted successfully!")
+            st.balloons()
             
         except Exception as e:
             st.error(f"Submission failed: {str(e)}")
