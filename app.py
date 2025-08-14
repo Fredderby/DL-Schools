@@ -8,7 +8,7 @@ st.set_page_config(page_title="DL Schools App", page_icon="🌍", layout="center
 
 with st.container(border=True):  
 # Header and section selector
-    st.image('./media/final.png')
+    st.image('./media/Final.png')
     
     survey = DeeperLifeSurvey()
     survey.run()
