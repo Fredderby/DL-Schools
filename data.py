@@ -26,6 +26,14 @@ class DeeperLifeSurvey:
         if "current_page" not in st.session_state:
             st.session_state.current_page = 1
             
+        # Form validation
+        if "basic_info_valid" not in st.session_state:
+            st.session_state.basic_info_valid = False
+        if "pupil_data_valid" not in st.session_state:
+            st.session_state.pupil_data_valid = False
+        if "financial_data_valid" not in st.session_state:
+            st.session_state.financial_data_valid = False
+            
         # Form data
         if "school_info" not in st.session_state:
             st.session_state.school_info = {
@@ -76,6 +84,31 @@ class DeeperLifeSurvey:
     def validate_phone(self, number):
         """Validate 10-digit phone number"""
         return re.match(r'^\d{10}$', number) is not None
+
+    def check_duplicate_entry(self):
+        """Check if the headmaster's details already exist in the database"""
+        try:
+            client = cred()
+            spreadsheet = client.open("DL Schools")
+            worksheet = spreadsheet.worksheet("DL")
+            
+            # Get all existing data
+            existing_data = worksheet.get_all_records()
+            
+            # Check for duplicates based on headmaster name, phone, whatsapp, region, and division
+            formatted_head_teacher = self.format_name(st.session_state.school_info["head_teacher"])
+            
+            for record in existing_data:
+                if (record.get("Head Teacher", "") == formatted_head_teacher and
+                    record.get("Phone", "") == st.session_state.school_info["phone"] and
+                    record.get("WhatsApp", "") == st.session_state.school_info["whatsapp"] and
+                    record.get("Region", "") == st.session_state.school_info["region"] and
+                    record.get("Division", "") == st.session_state.school_info["division"]):
+                    return True
+            return False
+        except Exception as e:
+            st.error(f"Error checking for duplicates: {str(e)}")
+            return False
 
     def school_info_section(self):
         with st.container(border=True):
@@ -305,8 +338,60 @@ class DeeperLifeSurvey:
         if not self.validate_phone(st.session_state.school_info["whatsapp"]):
             st.error("Valid 10-digit WhatsApp number required for Head Teacher")
             return False
+        
+        # Check for duplicate entry
+        if self.check_duplicate_entry():
+            st.error("This headmaster's information already exists in the database for this region and division.")
+            return False
             
         return True
+
+    def validate_pupil_data(self):
+        # Check if at least one class has students
+        total_students = 0
+        for level, values in st.session_state.class_data.items():
+            total_students += values["males"] + values["females"]
+        
+        if total_students == 0:
+            st.error("Pupil Data is required. Please enter data for at least one class.")
+            return False
+            
+        return True
+
+    def validate_financial_data(self):
+        # Check if all financial fields are filled
+        required_financial_fields = [
+            st.session_state.financial_data["admission_fees"],
+            st.session_state.financial_data["canteen_fees"],
+            st.session_state.financial_data["stationary_fees"],
+            st.session_state.financial_data["head_salary"],
+            st.session_state.financial_data["lowest_teacher_salary"],
+            st.session_state.financial_data["highest_teacher_salary"]
+        ]
+        
+        if not all(required_financial_fields):
+            st.error("All financial fields are required.")
+            return False
+            
+        return True
+
+    def next_page_callback(self):
+        if st.session_state.current_page == 1:
+            if self.validate_basic_info():
+                st.session_state.basic_info_valid = True
+                st.session_state.current_page = 2
+        elif st.session_state.current_page == 2:
+            if self.validate_pupil_data():
+                st.session_state.pupil_data_valid = True
+                st.session_state.current_page = 3
+        elif st.session_state.current_page == 3:
+            if self.validate_financial_data():
+                st.session_state.financial_data_valid = True
+                st.session_state.current_page = 4
+
+    def prev_page_callback(self):
+        if st.session_state.current_page > 1:
+            st.session_state.current_page -= 1
 
     def flatten_data(self):
         """Flatten all data into a single row for Google Sheets in the specified order"""
@@ -384,8 +469,8 @@ class DeeperLifeSurvey:
             st.error(f"Submission failed: {str(e)}")
 
     def page_one(self):
-        """First page with Basic Information and Teaching Staff"""
-        st.subheader("Deeper Life Basic Schools")
+        """First page with Basic Information"""
+        st.subheader("Deeper Life Basic Schools - Page 1/4")
         
         try:
             client = cred()
@@ -397,34 +482,61 @@ class DeeperLifeSurvey:
         
         self.school_info_section()
         
-        teaching_education = ["HND", "Diploma", "Masters", "PhD", "Bachelor", "WASSCE", "SSCE", "O'Level", "A'Level"]
-        st.session_state.teaching_staff = self.staff_section("teaching", teaching_education)
-        
-        # Next page button
-        if st.button("Next", type="primary"):
-            if self.validate_basic_info():
-                st.session_state.current_page = 2
-                st.rerun()
+        # Navigation buttons
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("Previous", disabled=True):
+                pass  # Disabled on first page
+        with col2:
+            if st.button("Next", type="primary", on_click=self.next_page_callback):
+                pass
 
     def page_two(self):
-        """Second page with all other sections"""
-        st.subheader("Deeper Life Basic Schools - Additional Information")
+        """Second page with Pupil Data"""
+        st.subheader("Deeper Life Basic Schools - Page 2/4")
         
-        # Previous page button
-        if st.button("Previous"):
-            st.session_state.current_page = 1
-            st.rerun()
+        self.pupils_section()
+        
+        # Navigation buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            st.button("Previous", on_click=self.prev_page_callback)
+        with col2:
+            st.button("Next", type="primary", on_click=self.next_page_callback)
+
+    def page_three(self):
+        """Third page with Financial Data"""
+        st.subheader("Deeper Life Basic Schools - Page 3/4")
+        
+        self.financial_section()
+        
+        # Navigation buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            st.button("Previous", on_click=self.prev_page_callback)
+        with col2:
+            st.button("Next", type="primary", on_click=self.next_page_callback)
+
+    def page_four(self):
+        """Fourth page with Optional Sections"""
+        st.subheader("Deeper Life Basic Schools - Page 4/4")
+        
+        teaching_education = ["HND", "Diploma", "Masters", "PhD", "Bachelor", "WASSCE", "SSCE", "O'Level", "A'Level"]
+        st.session_state.teaching_staff = self.staff_section("teaching", teaching_education)
         
         non_teaching_education = ["Bachelor", "HND", "Diploma", "WASSCE", "SSCE", "O'Level", "A'Level", 
                                  "Certificate", "JHS", "No School"]
         st.session_state.non_teaching_staff = self.staff_section("non_teaching", non_teaching_education)
         
-        self.pupils_section()
-        self.financial_section()
         st.session_state.committee_members = self.committee_section()
         
-        if st.button("Submit Data", type="primary"):
-            self.submit_data()
+        # Navigation and submit buttons
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            st.button("Previous", on_click=self.prev_page_callback)
+        with col3:
+            if st.button("Submit Data", type="primary"):
+                self.submit_data()
 
     def run(self):
         """Main method to run the app with page navigation"""
@@ -432,6 +544,10 @@ class DeeperLifeSurvey:
             self.page_one()
         elif st.session_state.current_page == 2:
             self.page_two()
+        elif st.session_state.current_page == 3:
+            self.page_three()
+        elif st.session_state.current_page == 4:
+            self.page_four()
 
 
 if __name__ == "__main__":
