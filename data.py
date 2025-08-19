@@ -281,10 +281,10 @@ class DeeperLifeSurvey:
         
         self.school_info_section()
         
-        teaching_education = ["HND", "Diploma", "Masters", "PhD", "WASSCE", "SSCE", "O'Level", "A'Level"]
+        teaching_education = ["HND", "Diploma", "Masters", "PhD","Bachelor", "WASSCE", "SSCE", "O'Level", "A'Level"]
         st.session_state.teaching_staff = self.staff_section("teaching", teaching_education)
         
-        non_teaching_education = ["HND", "Diploma", "WASSCE", "SSCE", "O'Level", "A'Level", 
+        non_teaching_education = ["Bachelor", "HND", "Diploma", "WASSCE", "SSCE", "O'Level", "A'Level", 
                                  "Certificate", "JHS", "No School"]
         st.session_state.non_teaching_staff = self.staff_section("non_teaching", non_teaching_education)
         
