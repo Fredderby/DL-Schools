@@ -20,7 +20,7 @@ class DeeperLifeSurvey:
         except FileNotFoundError:
             st.error(
                 "Error: The CSV file was not found. Please make sure "
-                "'zone - Original (1).xlsx - Sheet1 (2).csv' is in the correct directory."
+                "'zone - Original.csv' is in the correct directory."
             )
             self.df = pd.DataFrame(columns=['ZONE', 'REGION', 'DIVISION'])  # Empty fallback
 
@@ -59,7 +59,7 @@ class DeeperLifeSurvey:
 
     def school_info_section(self):
         with st.container(border=True):
-            st.subheader("School Information")
+            st.subheader("Basic Information")
 
             zones = self.df['ZONE'].unique()
             self.zone = st.selectbox("Zone*", options=zones, index=None, placeholder="Select a zone...")
@@ -194,24 +194,73 @@ class DeeperLifeSurvey:
             
         return True
 
+    def flatten_data(self):
+        """Flatten all data into a single row for Google Sheets"""
+        # School information
+        data = {
+            "Zone": self.zone,
+            "Region": self.region,
+            "Division": self.division,
+            "School Name": self.format_name(self.school_name),
+            "Head Teacher": self.format_name(self.head_teacher),
+            "Phone": self.phone,
+            "WhatsApp": self.whatsapp,
+        }
+        
+        # Teaching staff
+        for i, staff in enumerate(st.session_state.teaching_staff, 1):
+            data.update({
+                f"Teaching Staff {i} Name": staff["name"],
+                f"Teaching Staff {i} Gender": staff["gender"],
+                f"Teaching Staff {i} Education": staff["education"]
+            })
+        
+        # Non-teaching staff
+        for i, staff in enumerate(st.session_state.non_teaching_staff, 1):
+            data.update({
+                f"Non-Teaching Staff {i} Name": staff["name"],
+                f"Non-Teaching Staff {i} Gender": staff["gender"],
+                f"Non-Teaching Staff {i} Education": staff["education"]
+            })
+        
+        # Class data
+        for level, values in st.session_state.class_data.items():
+            data.update({
+                f"{level} Males": values["males"],
+                f"{level} Females": values["females"],
+                f"{level} Tuition": values["tuition"]
+            })
+        
+        # Financial data
+        financial_data = {
+            "Admission Fees": self.admission_fees,
+            "Canteen Fees": self.canteen_fees,
+            "Stationary Fees": self.stationary_fees,
+            "Head Teacher Salary": self.head_salary,
+            "Lowest Teacher Salary": self.lowest_teacher_salary,
+            "Highest Teacher Salary": self.highest_teacher_salary
+        }
+        data.update(financial_data)
+        
+        # Committee members
+        for i, member in enumerate(st.session_state.committee_members, 1):
+            data.update({
+                f"Committee Member {i} Name": member["name"],
+                f"Committee Member {i} Contact": member["contact"]
+            })
+        
+        return data
+
     def submit_data(self):
         try:
-            formatted_school_name = self.format_name(self.school_name)
-            formatted_head_teacher = self.format_name(self.head_teacher)
-            
-            data = {
-                "Zone": self.zone,
-                "Region": self.region,
-                "Division": self.division,
-                "School Name": formatted_school_name,
-                "Head Teacher": formatted_head_teacher,
-                "Phone": self.phone,
-                "WhatsApp": self.whatsapp,
-            }
+            # Get all flattened data
+            data = self.flatten_data()
             
             client = cred()
             spreadsheet = client.open("DL Schools")
             worksheet = spreadsheet.worksheet("DL")
+            
+            # Append all data as a single row
             worksheet.append_row(list(data.values()))
             st.success("✅ Data submitted successfully!")
             st.balloons()
@@ -220,7 +269,7 @@ class DeeperLifeSurvey:
             st.error(f"Submission failed: {str(e)}")
 
     def run(self):
-        st.title("Deeper Life Schools - Ghana")
+        st.subheader("Deeper Life Basic Schools")
                
         try:
             client = cred()
@@ -233,15 +282,15 @@ class DeeperLifeSurvey:
         self.school_info_section()
         
         teaching_education = ["HND", "Diploma", "Masters", "PhD", "WASSCE", "SSCE", "O'Level", "A'Level"]
-        teaching_staff = self.staff_section("teaching", teaching_education)
+        st.session_state.teaching_staff = self.staff_section("teaching", teaching_education)
         
         non_teaching_education = ["HND", "Diploma", "WASSCE", "SSCE", "O'Level", "A'Level", 
                                  "Certificate", "JHS", "No School"]
-        non_teaching_staff = self.staff_section("non_teaching", non_teaching_education)
+        st.session_state.non_teaching_staff = self.staff_section("non_teaching", non_teaching_education)
         
         self.pupils_section()
         self.financial_section()
-        committee_members = self.committee_section()
+        st.session_state.committee_members = self.committee_section()
         
         if st.button("Submit Data", type="primary"):
             if self.validate_form():
@@ -249,5 +298,5 @@ class DeeperLifeSurvey:
 
 
 if __name__ == "__main__":
-  DeeperLifeSurvey()
-    
+    DeeperLifeSurvey()
+   
