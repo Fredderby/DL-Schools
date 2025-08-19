@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
+import datetime
 from connect import cred
 import gspread
 from google.auth.exceptions import RefreshError, TransportError
@@ -33,6 +34,8 @@ class DeeperLifeSurvey:
             st.session_state.pupil_data_valid = False
         if "financial_data_valid" not in st.session_state:
             st.session_state.financial_data_valid = False
+        if "staff_counts_valid" not in st.session_state:
+            st.session_state.staff_counts_valid = False
             
         # Form data
         if "school_info" not in st.session_state:
@@ -46,12 +49,13 @@ class DeeperLifeSurvey:
                 "whatsapp": ""
             }
             
-        if "teaching_staff" not in st.session_state:
-            st.session_state.teaching_staff = []
-        if "non_teaching_staff" not in st.session_state:
-            st.session_state.non_teaching_staff = []
-        if "committee_members" not in st.session_state:
-            st.session_state.committee_members = []
+        if "staff_counts" not in st.session_state:
+            st.session_state.staff_counts = {
+                "teaching_staff_count": 0,
+                "non_teaching_staff_count": 0,
+                "committee_members_count": 0
+            }
+            
         if "financial_data" not in st.session_state:
             st.session_state.financial_data = {
                 "admission_fees": 0,
@@ -173,51 +177,6 @@ class DeeperLifeSurvey:
             if st.session_state.school_info["whatsapp"] and not self.validate_phone(st.session_state.school_info["whatsapp"]):
                 col2.error("Must be 10 digits")
 
-    def staff_section(self, staff_type, education_options, max_value=50):
-        with st.container(border=True):
-            st.subheader(f"{staff_type.replace('_', ' ').title()} Staff")
-            num_staff_key = f"{staff_type}_count"
-            
-            if num_staff_key not in st.session_state:
-                st.session_state[num_staff_key] = 0
-                
-            st.session_state[num_staff_key] = st.number_input(
-                f"Number of {staff_type.replace('_', ' ')} Staff*",
-                min_value=0,
-                max_value=max_value,
-                step=1,
-                key=f"{staff_type}_num_input"
-            )
-            
-            staff_data = []
-            if st.session_state[num_staff_key] > 0:
-                st.write(f"**Enter details for {st.session_state[num_staff_key]} {staff_type.replace('_', ' ')} staff:**")
-                for i in range(st.session_state[num_staff_key]):
-                    with st.expander(f"Staff Member #{i+1}", expanded=False):
-                        cols = st.columns(3)
-                        name = cols[0].text_input(f"Name*", key=f"{staff_type}_name_{i}").strip()
-                        gender = cols[1].selectbox(
-                            "Gender*", 
-                            ["Male", "Female"], 
-                            index=None,
-                            key=f"{staff_type}_gender_{i}"
-                        )
-                        education = cols[2].selectbox(
-                            "Highest Edu. Level*", 
-                            education_options, 
-                            index=None,
-                            key=f"{staff_type}_edu_{i}"
-                        )
-                        
-                        if name:
-                            name = self.format_name(name)
-                        staff_data.append({
-                            "name": name,
-                            "gender": gender,
-                            "education": education
-                        })
-            return staff_data
-
     def pupils_section(self):
         with st.container(border=True):
             st.subheader("Pupil Data by Class")
@@ -226,9 +185,9 @@ class DeeperLifeSurvey:
             for level in class_levels:
                 with st.expander(level, expanded=False):
                     cols = st.columns(3)
-                    males = cols[0].number_input("Males", min_value=0, key=f"{level}_males")
-                    females = cols[1].number_input("Females", min_value=0, key=f"{level}_females")
-                    tuition = cols[2].number_input("Tuition Fees (GHS)", min_value=0, key=f"{level}_tuition")
+                    males = cols[0].number_input("Males*", min_value=0, key=f"{level}_males")
+                    females = cols[1].number_input("Females*", min_value=0, key=f"{level}_females")
+                    tuition = cols[2].number_input("Tuition Fees (GHS)*", min_value=0, key=f"{level}_tuition")
                     
                     st.session_state.class_data[level] = {
                         "males": males,
@@ -286,37 +245,35 @@ class DeeperLifeSurvey:
                 key="highest_salary"
             )
 
-    def committee_section(self):
+    def staff_counts_section(self):
         with st.container(border=True):
-            st.subheader("School Management Committee")
+            st.subheader("Staff Counts")
             
-            if "committee_count" not in st.session_state:
-                st.session_state.committee_count = 0
-                
-            st.session_state.committee_count = st.number_input(
-                "Number of Committee Members*",
+            col1, col2, col3 = st.columns(3)
+            
+            st.session_state.staff_counts["teaching_staff_count"] = col1.number_input(
+                "Number of Teaching Staff*",
                 min_value=0,
-                max_value=20,
+                max_value=100,
                 step=1,
-                key="committee_count_input"
+                key="teaching_staff_count"
             )
             
-            committee_data = []
-            if st.session_state.committee_count > 0:
-                st.write(f"**Enter details for {st.session_state.committee_count} committee members:**")
-                for i in range(st.session_state.committee_count):
-                    with st.expander(f"Committee Member #{i+1}", expanded=False):
-                        cols = st.columns(2)
-                        name = cols[0].text_input(f"Name*", key=f"committee_name_{i}").strip()
-                        contact = cols[1].text_input(f"Contact*", key=f"committee_contact_{i}").strip()
-                        
-                        if name:
-                            name = self.format_name(name)
-                        committee_data.append({
-                            "name": name,
-                            "contact": contact
-                        })
-            return committee_data
+            st.session_state.staff_counts["non_teaching_staff_count"] = col2.number_input(
+                "Number of Non-Teaching Staff*",
+                min_value=0,
+                max_value=100,
+                step=1,
+                key="non_teaching_staff_count"
+            )
+            
+            st.session_state.staff_counts["committee_members_count"] = col3.number_input(
+                "Number of Committee Members*",
+                min_value=0,
+                max_value=50,
+                step=1,
+                key="committee_members_count"
+            )
 
     def validate_basic_info(self):
         required_fields = [
@@ -324,7 +281,9 @@ class DeeperLifeSurvey:
             st.session_state.school_info["region"], 
             st.session_state.school_info["division"], 
             st.session_state.school_info["school_name"], 
-            st.session_state.school_info["head_teacher"]
+            st.session_state.school_info["head_teacher"],
+            st.session_state.school_info["phone"],
+            st.session_state.school_info["whatsapp"]
         ]
         
         if not all(required_fields):
@@ -347,15 +306,12 @@ class DeeperLifeSurvey:
         return True
 
     def validate_pupil_data(self):
-        # Check if at least one class has students
-        total_students = 0
+        # Check if all classes have data
         for level, values in st.session_state.class_data.items():
-            total_students += values["males"] + values["females"]
-        
-        if total_students == 0:
-            st.error("Pupil Data is required. Please enter data for at least one class.")
-            return False
-            
+            if values["males"] == 0 and values["females"] == 0 and values["tuition"] == 0:
+                st.error(f"Pupil Data is required for {level}. Please enter data for all classes.")
+                return False
+                
         return True
 
     def validate_financial_data(self):
@@ -375,6 +331,20 @@ class DeeperLifeSurvey:
             
         return True
 
+    def validate_staff_counts(self):
+        # Check if all staff count fields are filled
+        required_staff_fields = [
+            st.session_state.staff_counts["teaching_staff_count"],
+            st.session_state.staff_counts["non_teaching_staff_count"],
+            st.session_state.staff_counts["committee_members_count"]
+        ]
+        
+        if not all(required_staff_fields):
+            st.error("All staff count fields are required.")
+            return False
+            
+        return True
+
     def next_page_callback(self):
         if st.session_state.current_page == 1:
             if self.validate_basic_info():
@@ -384,10 +354,6 @@ class DeeperLifeSurvey:
             if self.validate_pupil_data():
                 st.session_state.pupil_data_valid = True
                 st.session_state.current_page = 3
-        elif st.session_state.current_page == 3:
-            if self.validate_financial_data():
-                st.session_state.financial_data_valid = True
-                st.session_state.current_page = 4
 
     def prev_page_callback(self):
         if st.session_state.current_page > 1:
@@ -396,6 +362,11 @@ class DeeperLifeSurvey:
     def flatten_data(self):
         """Flatten all data into a single row for Google Sheets in the specified order"""
         data = {}
+        
+        # Add timestamp first
+        data.update({
+            "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
         
         # 1. Basic information
         data.update({
@@ -426,39 +397,36 @@ class DeeperLifeSurvey:
             "Highest Teacher Salary": st.session_state.financial_data["highest_teacher_salary"]
         })
         
-        # 4. School Management committees
-        for i, member in enumerate(st.session_state.committee_members, 1):
-            data.update({
-                f"Committee Member {i} Name": member["name"],
-                f"Committee Member {i} Contact": member["contact"]
-            })
-        
-        # 5. Teaching staffs
-        for i, staff in enumerate(st.session_state.teaching_staff, 1):
-            data.update({
-                f"Teaching Staff {i} Name": staff["name"],
-                f"Teaching Staff {i} Gender": staff["gender"],
-                f"Teaching Staff {i} Education": staff["education"]
-            })
-        
-        # 6. Non-teaching staffs
-        for i, staff in enumerate(st.session_state.non_teaching_staff, 1):
-            data.update({
-                f"Non-Teaching Staff {i} Name": staff["name"],
-                f"Non-Teaching Staff {i} Gender": staff["gender"],
-                f"Non-Teaching Staff {i} Education": staff["education"]
-            })
+        # 4. Staff counts
+        data.update({
+            "Number of Teaching Staff": st.session_state.staff_counts["teaching_staff_count"],
+            "Number of Non-Teaching Staff": st.session_state.staff_counts["non_teaching_staff_count"],
+            "Number of Committee Members": st.session_state.staff_counts["committee_members_count"]
+        })
         
         return data
 
     def submit_data(self):
         try:
+            # Validate all sections before submission
+            if not (self.validate_basic_info() and self.validate_pupil_data() and 
+                   self.validate_financial_data() and self.validate_staff_counts()):
+                st.error("Please complete all required fields before submitting.")
+                return
+                
             # Get all flattened data
             data = self.flatten_data()
             
             client = cred()
             spreadsheet = client.open("DL Schools")
             worksheet = spreadsheet.worksheet("DL")
+            
+            # Check if the sheet is empty (no headers)
+            existing_data = worksheet.get_all_values()
+            if len(existing_data) == 0:
+                # Add headers as the first row
+                headers = list(data.keys())
+                worksheet.append_row(headers)
             
             # Append all data as a single row
             worksheet.append_row(list(data.values()))
@@ -470,7 +438,7 @@ class DeeperLifeSurvey:
 
     def page_one(self):
         """First page with Basic Information"""
-        st.subheader("Deeper Life Basic Schools - Page 1/4")
+        st.subheader("Deeper Life Basic Schools - Page 1/3")
         
         try:
             client = cred()
@@ -493,7 +461,7 @@ class DeeperLifeSurvey:
 
     def page_two(self):
         """Second page with Pupil Data"""
-        st.subheader("Deeper Life Basic Schools - Page 2/4")
+        st.subheader("Deeper Life Basic Schools - Page 2/3")
         
         self.pupils_section()
         
@@ -505,30 +473,19 @@ class DeeperLifeSurvey:
             st.button("Next", type="primary", on_click=self.next_page_callback)
 
     def page_three(self):
-        """Third page with Financial Data"""
-        st.subheader("Deeper Life Basic Schools - Page 3/4")
+        """Third page with Financial Data and Staff Counts"""
+        st.subheader("Deeper Life Basic Schools - Page 3/3")
         
         self.financial_section()
+        self.staff_counts_section()
         
-        # Navigation buttons
-        col1, col2 = st.columns(2)
-        with col1:
-            st.button("Previous", on_click=self.prev_page_callback)
-        with col2:
-            st.button("Next", type="primary", on_click=self.next_page_callback)
-
-    def page_four(self):
-        """Fourth page with Optional Sections"""
-        st.subheader("Deeper Life Basic Schools - Page 4/4")
-        
-        teaching_education = ["HND", "Diploma", "Masters", "PhD", "Bachelor", "WASSCE", "SSCE", "O'Level", "A'Level"]
-        st.session_state.teaching_staff = self.staff_section("teaching", teaching_education)
-        
-        non_teaching_education = ["Bachelor", "HND", "Diploma", "WASSCE", "SSCE", "O'Level", "A'Level", 
-                                 "Certificate", "JHS", "No School"]
-        st.session_state.non_teaching_staff = self.staff_section("non_teaching", non_teaching_education)
-        
-        st.session_state.committee_members = self.committee_section()
+        # Add footnote about submitting detailed information
+        st.markdown("---")
+        st.info(
+            "**Important Note:** Please submit the detailed lists of Committee members, "
+            "Teaching staff, and Non-teaching staff (including their salaries, qualifications, "
+            "and contact information) to the email: **dledu.director@dclmgh.org**"
+        )
         
         # Navigation and submit buttons
         col1, col2, col3 = st.columns([1, 1, 2])
@@ -546,10 +503,8 @@ class DeeperLifeSurvey:
             self.page_two()
         elif st.session_state.current_page == 3:
             self.page_three()
-        elif st.session_state.current_page == 4:
-            self.page_four()
 
 
 if __name__ == "__main__":
     DeeperLifeSurvey()
-    
+  
