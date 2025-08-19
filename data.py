@@ -309,9 +309,11 @@ class DeeperLifeSurvey:
         return True
 
     def flatten_data(self):
-        """Flatten all data into a single row for Google Sheets"""
-        # School information
-        data = {
+        """Flatten all data into a single row for Google Sheets in the specified order"""
+        data = {}
+        
+        # 1. Basic information
+        data.update({
             "Zone": st.session_state.school_info["zone"],
             "Region": st.session_state.school_info["region"],
             "Division": st.session_state.school_info["division"],
@@ -319,25 +321,9 @@ class DeeperLifeSurvey:
             "Head Teacher": self.format_name(st.session_state.school_info["head_teacher"]),
             "Phone": st.session_state.school_info["phone"],
             "WhatsApp": st.session_state.school_info["whatsapp"],
-        }
+        })
         
-        # Teaching staff
-        for i, staff in enumerate(st.session_state.teaching_staff, 1):
-            data.update({
-                f"Teaching Staff {i} Name": staff["name"],
-                f"Teaching Staff {i} Gender": staff["gender"],
-                f"Teaching Staff {i} Education": staff["education"]
-            })
-        
-        # Non-teaching staff
-        for i, staff in enumerate(st.session_state.non_teaching_staff, 1):
-            data.update({
-                f"Non-Teaching Staff {i} Name": staff["name"],
-                f"Non-Teaching Staff {i} Gender": staff["gender"],
-                f"Non-Teaching Staff {i} Education": staff["education"]
-            })
-        
-        # Class data
+        # 2. Pupil Data by Class
         for level, values in st.session_state.class_data.items():
             data.update({
                 f"{level} Males": values["males"],
@@ -345,7 +331,7 @@ class DeeperLifeSurvey:
                 f"{level} Tuition": values["tuition"]
             })
         
-        # Financial data
+        # 3. Fees and Salaries
         data.update({
             "Admission Fees": st.session_state.financial_data["admission_fees"],
             "Canteen Fees": st.session_state.financial_data["canteen_fees"],
@@ -355,11 +341,27 @@ class DeeperLifeSurvey:
             "Highest Teacher Salary": st.session_state.financial_data["highest_teacher_salary"]
         })
         
-        # Committee members
+        # 4. School Management committees
         for i, member in enumerate(st.session_state.committee_members, 1):
             data.update({
                 f"Committee Member {i} Name": member["name"],
                 f"Committee Member {i} Contact": member["contact"]
+            })
+        
+        # 5. Teaching staffs
+        for i, staff in enumerate(st.session_state.teaching_staff, 1):
+            data.update({
+                f"Teaching Staff {i} Name": staff["name"],
+                f"Teaching Staff {i} Gender": staff["gender"],
+                f"Teaching Staff {i} Education": staff["education"]
+            })
+        
+        # 6. Non-teaching staffs
+        for i, staff in enumerate(st.session_state.non_teaching_staff, 1):
+            data.update({
+                f"Non-Teaching Staff {i} Name": staff["name"],
+                f"Non-Teaching Staff {i} Gender": staff["gender"],
+                f"Non-Teaching Staff {i} Education": staff["education"]
             })
         
         return data
